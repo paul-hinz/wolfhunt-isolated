@@ -50,11 +50,21 @@ public class LandscapeLayer : AbstractLayer {
         // Console.WriteLine(new BoundingBox(baseExtent));
 
         // Create GeoHashEnvironment with the calculated extent
-        Environment = GeoHashEnvironment<AbstractAnimal>.BuildByBBox(new BoundingBox(53, -13, 54, -12), 1000);
+        Environment = GeoHashEnvironment<AbstractAnimal>.BuildByBBox(new BoundingBox(53, -13, 54, -12), 1);
 
         var agentManager = layerInitData.Container.Resolve<IAgentManager>();
         Preys = agentManager.Spawn<Prey, LandscapeLayer>().ToList();
         Wolfs = agentManager.Spawn<Wolf, LandscapeLayer>().ToList();
+        
+        foreach (var prey in Preys)
+        {
+            Environment.Insert(prey);
+        }
+        
+        foreach (var wolf in Wolfs)
+        {
+            Environment.Insert(wolf);
+        }
         
         return Preys.Count + Wolfs.Count > 0;
     }

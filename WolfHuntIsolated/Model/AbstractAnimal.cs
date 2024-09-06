@@ -53,10 +53,6 @@ public abstract class AbstractAnimal : IPositionable, IAgent<LandscapeLayer> {
     
     [PropertyDescription]
     public int RandomWalkMinDistanceInM { get; set;  }
-    
-    protected const double MaxHydration = 100.0;
-    protected const double MaxSatiety = 100.0; 
-    public const int MaxAge = 25;
 
     #endregion
     

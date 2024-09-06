@@ -43,7 +43,7 @@ public class Prey : AbstractAnimal {
     public static double RunningSpeedInMs { get; set; }
     #endregion
     
-    public override void Tick() { 
+    public override void Tick() {
         
         if (IsFirstTick)
         {
@@ -54,6 +54,7 @@ public class Prey : AbstractAnimal {
     }
     public override void FirstTick()
     {
+        Console.WriteLine("Prey spawned at:" + Position);
         CalculateParams();
     }
 
