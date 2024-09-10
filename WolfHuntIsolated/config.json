@@ -1,8 +1,8 @@
 {
   "globals": {
-    "deltaT": 5,
-    "startPoint": "2018-11-18T15:40:00",
-    "endPoint": "2018-11-18T16:00:00",
+    "deltaT": 1,
+    "startPoint": "2018-11-18T16:00:00",
+    "endPoint": "2018-11-18T16:00:10",
     "deltaTUnit": "seconds",
     "console": false,
     "output": "csv",
@@ -36,16 +36,14 @@
       ],
       "file":"Resources/preys.csv",
       "outputs": [
-        {
-        "kind": "trips"
-        }]
+        ]
     },
     {
       "name": "Wolf",
       "mapping": [
         {
           "parameter": "RunningSpeedInMs",
-          "value": 14
+          "value": 2
         },
         {
           "parameter": "SafeDistanceToPrey",

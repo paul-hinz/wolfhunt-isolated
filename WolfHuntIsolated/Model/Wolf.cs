@@ -42,6 +42,8 @@ public class Wolf : AbstractAnimal, IComparable
     public Prey HuntingTarget = null;
     private bool IsTickZero = true;
     public double BearingToPrey;
+    public readonly object WolfLock = new object();
+    private static readonly object CircleLock = new object();
     
     #endregion
 
@@ -110,68 +112,85 @@ public class Wolf : AbstractAnimal, IComparable
     private void CalculateTarget()
     {
         var distLeft = RunDistancePerTick;
-        if (Position.DistanceInMTo(HuntingTarget.Position) > SafeDistanceToPrey)
+        Console.WriteLine(ID + ": is distance away: " + Position.DistanceInMTo(HuntingTarget.Position));
+        if (Position.DistanceInMTo(HuntingTarget.Position) > SafeDistanceToPrey + 0.01)
         {
+            Console.WriteLine(ID + ": has to catch up");
             //catch up to safe distance
             var bearing = Position.GetBearing(HuntingTarget.Position);
-            Target = Position.GetRelativePosition(bearing, RunDistancePerTick);
+
+            var runDistance = RunDistancePerTick;
+            var distToCover = Position.DistanceInMTo(HuntingTarget.Position);
+            if (distToCover < RunDistancePerTick)
+            {
+                runDistance = distToCover - SafeDistanceToPrey;
+                Console.WriteLine(ID + ": should now be on circle, runDistance= " + runDistance);
+            }
+            
+            Target = Position.GetRelativePosition(bearing, runDistance);
 
             var newDist = Target.DistanceInMTo(HuntingTarget.Position);
 
             // if too close move away
-            if (newDist > SafeDistanceToPrey) return;
+            if (newDist > SafeDistanceToPrey + 0.01) return;
             Target = HuntingTarget.Position.GetRelativePosition(InvertBearing(bearing), SafeDistanceToPrey);
-            BearingToPrey = bearing;
+            SetBearingToPrey(bearing);
             WolfLister._list.Register(this);
-            distLeft = SafeDistanceToPrey - newDist;
         }
-
-        //find spot on circle
-        var left = WolfLister._list.GetLeft(this);
-        var right = WolfLister._list.GetRight(this);
-
-        if (left is not null)
+        else
         {
-            if (right is null)
+            lock (CircleLock)
             {
-                var oppositeBearing = left.Position.GetBearing(HuntingTarget.Position);
-                Target = HuntingTarget.Position.GetRelativePosition(oppositeBearing, SafeDistanceToPrey);
-                BearingToPrey = InvertBearing(oppositeBearing);
-                return;
+                //find spot on circle
+                var left = WolfLister._list.GetLeft(this);
+                var right = WolfLister._list.GetRight(this);
+
+                if (left is not null)
+                {
+                    if (right is null)
+                    {
+                        var oppositeBearing = left.Position.GetBearing(HuntingTarget.Position);
+                        Target = HuntingTarget.Position.GetRelativePosition(oppositeBearing, SafeDistanceToPrey);
+                        SetBearingToPrey(InvertBearing(oppositeBearing));
+                        return;
+                    }
+
+                    Console.WriteLine("2 neighbours found");
+
+                    //Find middle between both neighbours
+                    var fullDist = left.Position.DistanceInMTo(right.Position);
+                    var bear = left.Position.GetBearing(right.Position);
+                    var middle = left.Position.GetRelativePosition(bear, fullDist / 2);
+
+                    // check if swap is needed
+                    var bearDiffLeft = HuntingTarget.Position.GetBearing(left.Position) -
+                                       Position.GetBearing(left.Position);
+                    var bearDiffRight = HuntingTarget.Position.GetBearing(right.Position) -
+                                        Position.GetBearing(right.Position);
+
+                    //Calculate bearing
+                    var bearingFromPrey = middle.GetBearing(HuntingTarget.Position);
+
+                    //invert if all three wolfs are on one half of the circle
+                    if (Math.Abs(bearDiffRight) + Math.Abs(bearDiffLeft) > 180)
+                        bearingFromPrey = InvertBearing(bearingFromPrey);
+
+                    Target = HuntingTarget.Position.GetRelativePosition(bearingFromPrey, SafeDistanceToPrey);
+
+                    var distToTarget = Position.DistanceInMTo(Target);
+                    //if (distToTarget > distLeft) Target = Position.GetRelativePosition(Position.GetBearing(Target), distLeft);
+                    
+                    SetBearingToPrey(InvertBearing(bearingFromPrey));
+                }
             }
-            
-                //Find middle between both neighbours
-                var fullDist = left.Position.DistanceInMTo(right.Position);
-                var bear = left.Position.GetBearing(right.Position);
-                var middle = left.Position.GetRelativePosition(bear, fullDist / 2);
-
-                // check if swap is needed
-                var bearDiffLeft = HuntingTarget.Position.GetBearing(left.Position) -
-                                   Position.GetBearing(left.Position);
-                var bearDiffRight = HuntingTarget.Position.GetBearing(right.Position) -
-                                    Position.GetBearing(right.Position);
-
-                //Calculate bearing
-                var bearingFromPrey = middle.GetBearing(HuntingTarget.Position);
-
-                //invert if all three wolfs are on one half of the circle
-                if (Math.Abs(bearDiffRight) + Math.Abs(bearDiffLeft) < 180) bearingFromPrey = InvertBearing(bearingFromPrey);
-
-                Target = HuntingTarget.Position.GetRelativePosition(bearingFromPrey, SafeDistanceToPrey);
-
-                var distToTarget = Position.DistanceInMTo(Target);
-                if (distToTarget > distLeft)
-                    Target = Position.GetRelativePosition(Position.GetBearing(Target), distLeft);
-
-                BearingToPrey = InvertBearing(bearingFromPrey);
         }
     }
 
     public int CompareTo(object obj)
     {
-        if (obj is not Wolf) return 0;
-        Wolf other = (Wolf)obj;
-        return (int) (BearingToPrey - other.BearingToPrey);
+        if (obj is not Wolf wolf) return -1;
+        if (this.Equals(wolf)) return 0;
+        return BearingToPrey.CompareTo(wolf.BearingToPrey);
     }
 
     private double InvertBearing(double bearing)
@@ -180,5 +199,21 @@ public class Wolf : AbstractAnimal, IComparable
         if(bearing > 180 ) return bearing - 180;
         if (bearing <= 180) return bearing + 180;
         return -1;
+    }
+    
+    public void SetBearingToPrey(double bearing)
+    {
+        lock (WolfLock)
+        {
+            BearingToPrey = bearing;
+        }
+    }
+
+    public double GetBearingToPrey()
+    {
+        lock (WolfLock)
+        {
+            return BearingToPrey;
+        }
     }
 }
